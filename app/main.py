@@ -15,6 +15,8 @@ from app.api.service_providers import router as service_providers_router
 from app.api.cart import router as cart_router
 from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
+from app.api.auth import router as auth_router
+
 
 app = FastAPI(
     title="Maathre Backend API",
@@ -74,7 +76,7 @@ app.include_router(
     prefix="/payments",
     tags=["Payments"],
 )
-
+app.include_router(auth_router)  #prefix="/api/auth" set in api/auth.py
 # --------------------
 # Health Check
 # --------------------
