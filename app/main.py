@@ -1,12 +1,9 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-
-from app.db.session import get_db
+from fastapi import FastAPI
 
 # --------------------
 # API Routers
 # --------------------
+from app.api.auth import router as auth_router
 from app.api.service_categories import router as service_categories_router
 from app.api.services import router as services_router
 from app.api.service_packages import router as service_packages_router
@@ -15,8 +12,6 @@ from app.api.service_providers import router as service_providers_router
 from app.api.cart import router as cart_router
 from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
-from app.api.auth import router as auth_router
-
 
 app = FastAPI(
     title="Maathre Backend API",
@@ -28,6 +23,8 @@ app = FastAPI(
 # --------------------
 # Register API Routers
 # --------------------
+
+app.include_router(auth_router)  # prefix already set in auth.py
 
 app.include_router(
     service_categories_router,
@@ -76,15 +73,15 @@ app.include_router(
     prefix="/payments",
     tags=["Payments"],
 )
-app.include_router(auth_router)  #prefix="/api/auth" set in api/auth.py
+
 # --------------------
 # Health Check
 # --------------------
 
 @app.get("/health", tags=["Health"])
-async def health_check(db: AsyncSession = Depends(get_db)):
-    await db.execute(text("SELECT 1"))
+async def health_check():
     return {
         "status": "ok",
-        "db": "connected",
+        "backend": "running",
+        "database": "supabase",
     }

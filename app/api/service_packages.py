@@ -1,14 +1,9 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query
 
-from app.db.session import get_db
-from app.db.crud.service_package import (
-    get_all_service_packages,
-    get_service_package_by_id,
-)
+from app.core.supabase import supabase
 from app.schemas.service_package import ServicePackageOut
 
 router = APIRouter(
@@ -18,21 +13,46 @@ router = APIRouter(
 
 
 @router.get("/", response_model=List[ServicePackageOut])
-async def list_service_packages(
+def list_service_packages(
     service_id: Optional[UUID] = Query(None),
-    db: AsyncSession = Depends(get_db),
 ):
-    return await get_all_service_packages(db, service_id)
+    query = supabase.table("service_packages").select("*")
+
+    if service_id:
+        query = query.eq("service_id", str(service_id))
+
+    response = query.execute()
+
+    if response.error:
+        raise HTTPException(
+            status_code=500,
+            detail=response.error.message,
+        )
+
+    return response.data
 
 
 @router.get("/{package_id}", response_model=ServicePackageOut)
-async def get_service_package(
-    package_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    package = await get_service_package_by_id(db, package_id)
+def get_service_package(package_id: UUID):
+    response = (
+        supabase
+        .table("service_packages")
+        .select("*")
+        .eq("id", str(package_id))
+        .single()
+        .execute()
+    )
 
-    if not package:
-        raise HTTPException(status_code=404, detail="Service package not found")
+    if response.error:
+        if response.error.code == "PGRST116":
+            raise HTTPException(
+                status_code=404,
+                detail="Service package not found",
+            )
 
-    return package
+        raise HTTPException(
+            status_code=500,
+            detail=response.error.message,
+        )
+
+    return response.data

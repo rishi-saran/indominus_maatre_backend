@@ -1,37 +1,58 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query
 
-from app.db.session import get_db
-from app.db.crud.service_addon import (
-    get_all_service_addons,
-    get_service_addon_by_id,
-)
+from app.core.supabase import supabase
 from app.schemas.service_addon import ServiceAddonOut
 
 router = APIRouter(
-    tags=["Service Addons"]
+    prefix="/service-addons",
+    tags=["Service Addons"],
 )
 
 
 @router.get("/", response_model=List[ServiceAddonOut])
-async def list_service_addons(
+def list_service_addons(
     service_id: Optional[UUID] = Query(None),
-    db: AsyncSession = Depends(get_db),
 ):
-    return await get_all_service_addons(db, service_id)
+    query = supabase.table("service_addons").select("*")
+
+    if service_id:
+        query = query.eq("service_id", str(service_id))
+
+    response = query.execute()
+
+    if response.error:
+        raise HTTPException(
+            status_code=500,
+            detail=response.error.message,
+        )
+
+    return response.data
 
 
 @router.get("/{addon_id}", response_model=ServiceAddonOut)
-async def get_service_addon(
-    addon_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    addon = await get_service_addon_by_id(db, addon_id)
+def get_service_addon(addon_id: UUID):
+    response = (
+        supabase
+        .table("service_addons")
+        .select("*")
+        .eq("id", str(addon_id))
+        .single()
+        .execute()
+    )
 
-    if not addon:
-        raise HTTPException(status_code=404, detail="Service addon not found")
+    if response.error:
+        if response.error.code == "PGRST116":
+            raise HTTPException(
+                status_code=404,
+                detail="Service addon not found",
+            )
 
-    return addon
+        raise HTTPException(
+            status_code=500,
+            detail=response.error.message,
+        )
+
+    return response.data

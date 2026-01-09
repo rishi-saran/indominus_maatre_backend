@@ -1,76 +1,103 @@
 from uuid import UUID
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query
 
-from app.db.session import get_db
-from app.db.crud.payment import (
-    create_payment,
-    get_payment_by_id,
-    get_payments_by_order,
-)
+from app.core.supabase import supabase
 from app.schemas.payment import PaymentOut
 
 router = APIRouter(
-    tags=["Payments"]
+    prefix="/payments",
+    tags=["Payments"],
 )
-
 
 # --------------------
 # Create Payment
 # --------------------
 @router.post("/", response_model=PaymentOut)
-async def create_payment_entry(
+def create_payment_entry(
     order_id: UUID = Query(...),
     method: str = Query(...),
     status: str = Query(...),
     amount: float = Query(...),
     user_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
 ):
-    payment = await create_payment(
-        db=db,
-        order_id=order_id,
-        method=method,
-        status=status,
-        amount=amount,
+    # 1. Create payment entry
+    payment_resp = (
+        supabase
+        .table("payments")
+        .insert({
+            "order_id": str(order_id),
+            "method": method,
+            "status": status,
+            "amount": amount,
+        })
+        .single()
+        .execute()
     )
 
-    # --------------------
-    # Clear cart on success
-    # --------------------
-    if status.upper() == "SUCCESS":
-        from app.db.crud.cart import get_cart, clear_cart
+    if payment_resp.error:
+        raise HTTPException(
+            status_code=500,
+            detail=payment_resp.error.message,
+        )
 
-        cart = await get_cart(db, user_id)
-        if cart:
-            await clear_cart(db, cart.id)
+    payment = payment_resp.data
+
+    # 2. Clear cart if payment successful
+    if status.upper() == "SUCCESS":
+        cart_resp = (
+            supabase
+            .table("carts")
+            .select("id")
+            .eq("user_id", str(user_id))
+            .single()
+            .execute()
+        )
+
+        if cart_resp.data:
+            cart_id = cart_resp.data["id"]
+            supabase.table("cart_items").delete().eq(
+                "cart_id", cart_id
+            ).execute()
 
     return payment
+
 
 # --------------------
 # Get Payment by ID
 # --------------------
 @router.get("/{payment_id}", response_model=PaymentOut)
-async def get_payment(
-    payment_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    payment = await get_payment_by_id(db, payment_id)
+def get_payment(payment_id: UUID):
+    resp = (
+        supabase
+        .table("payments")
+        .select("*")
+        .eq("id", str(payment_id))
+        .single()
+        .execute()
+    )
 
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
+    if not resp.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment not found",
+        )
 
-    return payment
+    return resp.data
 
 
 # --------------------
 # List Payments by Order
 # --------------------
 @router.get("/", response_model=List[PaymentOut])
-async def list_payments(
-    order_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
-):
-    return await get_payments_by_order(db, order_id)
+def list_payments(order_id: UUID = Query(...)):
+    resp = (
+        supabase
+        .table("payments")
+        .select("*")
+        .eq("order_id", str(order_id))
+        .execute()
+    )
+
+    return resp.data or []
