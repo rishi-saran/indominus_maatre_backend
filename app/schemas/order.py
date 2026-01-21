@@ -12,7 +12,9 @@ class OrderOut(BaseModel):
     address_id: Optional[UUID]
     total_amount: float
     status: str
-    items: List[OrderItemOut] = []
+
+    # MUST match Supabase relationship key
+    order_items: List[OrderItemOut] = []
 
     class Config:
         from_attributes = True

@@ -16,43 +16,35 @@ router = APIRouter(
 def list_service_providers(
     verified: Optional[bool] = Query(None),
 ):
-    query = supabase.table("service_providers").select("*")
+    try:
+        query = supabase.table("service_providers").select("*")
 
-    if verified is not None:
-        query = query.eq("verified", verified)
+        if verified is not None:
+            query = query.eq("verified", verified)
 
-    response = query.execute()
-
-    if response.error:
-        raise HTTPException(
-            status_code=500,
-            detail=response.error.message,
-        )
-
-    return response.data
+        response = query.execute()
+        return response.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{provider_id}", response_model=ServiceProviderOut)
 def get_service_provider(provider_id: UUID):
-    response = (
-        supabase
-        .table("service_providers")
-        .select("*")
-        .eq("id", str(provider_id))
-        .single()
-        .execute()
-    )
-
-    if response.error:
-        if response.error.code == "PGRST116":
-            raise HTTPException(
-                status_code=404,
-                detail="Service provider not found",
-            )
-
-        raise HTTPException(
-            status_code=500,
-            detail=response.error.message,
+    try:
+        response = (
+            supabase
+            .table("service_providers")
+            .select("*")
+            .eq("id", str(provider_id))
+            .single()
+            .execute()
         )
-
-    return response.data
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Service provider not found")
+        
+        return response.data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

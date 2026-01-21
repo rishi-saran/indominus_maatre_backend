@@ -8,7 +8,7 @@ from app.schemas.cart_item import CartItemOut
 class CartOut(BaseModel):
     id: UUID
     user_id: UUID
-    items: List[CartItemOut] = []
+    cart_items: List[CartItemOut] = []
 
     class Config:
         from_attributes = True

@@ -4,11 +4,11 @@ from app.schemas.auth import SignupRequest, LoginRequest
 from app.schemas.user import UserResponse
 from app.core.supabase import supabase
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 # -----------------------------
-# Helpers
+# Cookie Helpers
 # -----------------------------
 
 def _set_auth_cookies(
@@ -17,27 +17,30 @@ def _set_auth_cookies(
     access_token: str,
     refresh_token: str,
 ):
+    # Access token (used for API auth)
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,          # False only for local dev
+        secure=False,          # set True in production with HTTPS
         samesite="strict",
         path="/",
     )
+
+    # Refresh token (used only for refresh endpoint)
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,          # False only for local dev
+        secure=False,          # set True in production with HTTPS
         samesite="strict",
-        path="/api/auth",
+        path="/api/v1/auth",
     )
 
 
 def _clear_auth_cookies(response: Response):
     response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/api/auth")
+    response.delete_cookie("refresh_token", path="/api/v1/auth")
 
 
 # -----------------------------
@@ -50,6 +53,10 @@ def _clear_auth_cookies(response: Response):
     status_code=status.HTTP_201_CREATED,
 )
 async def signup(payload: SignupRequest):
+    """
+    1. Create user in Supabase Auth (auth.users)
+    2. Create matching row in public.profiles
+    """
     try:
         result = supabase.auth.sign_up(
             {
@@ -58,12 +65,21 @@ async def signup(payload: SignupRequest):
             }
         )
 
-        if result.user is None:
+        user = result.user
+        if not user:
             raise HTTPException(status_code=400, detail="Signup failed")
 
+        # 🔑 Create profile row linked to auth.users.id
+        supabase.table("profiles").insert(
+            {
+                "id": user.id,
+                "role": "user",
+            }
+        ).execute()
+
         return UserResponse(
-            id=result.user.id,
-            email=result.user.email,
+            id=user.id,
+            email=user.email,
         )
 
     except Exception as e:
@@ -75,6 +91,9 @@ async def login(
     payload: LoginRequest,
     response: Response,
 ):
+    """
+    Login using Supabase Auth
+    """
     try:
         result = supabase.auth.sign_in_with_password(
             {
@@ -93,7 +112,11 @@ async def login(
             refresh_token=session.refresh_token,
         )
 
-        return {"message": "Login successful"}
+        return {
+            "message": "Login successful",
+            "user_id": result.user.id,
+            "email": result.user.email,
+        }
 
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -104,6 +127,9 @@ async def refresh(
     request: Request,
     response: Response,
 ):
+    """
+    Refresh access token using refresh token cookie
+    """
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Missing refresh token")
@@ -128,8 +154,9 @@ async def refresh(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(
-    response: Response,
-):
+async def logout(response: Response):
+    """
+    Clear auth cookies
+    """
     _clear_auth_cookies(response)
     return None

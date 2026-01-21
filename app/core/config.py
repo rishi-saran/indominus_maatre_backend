@@ -1,12 +1,20 @@
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 
-# this is just for development testing, need to change this in prod
 
-class Settings(BaseModel):
-    # JWT
-    JWT_SECRET_KEY: str = "super-secret-change-me"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+class Settings(BaseSettings):
+    # Supabase Configuration
+    SUPABASE_URL: str
+    SUPABASE_SERVICE_ROLE_KEY: str
+    SUPABASE_ANON_KEY: str
+    SUPABASE_JWT_SECRET: str
+    
+    # Razorpay Configuration
+    RAZORPAY_KEY_ID: str
+    RAZORPAY_KEY_SECRET: str
+    RAZORPAY_WEBHOOK_SECRET: str
+
+    class Config:
+        env_file = ".env"
 
 
 settings = Settings()

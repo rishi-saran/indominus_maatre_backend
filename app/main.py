@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+from fastapi import APIRouter
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 # --------------------
 # API Routers
@@ -12,7 +15,12 @@ from app.api.service_providers import router as service_providers_router
 from app.api.cart import router as cart_router
 from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
+from app.api.addresses import router as addresses_router
 
+
+# --------------------
+# FastAPI App
+# --------------------
 app = FastAPI(
     title="Maathre Backend API",
     version="1.0.0",
@@ -20,64 +28,48 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+
 # --------------------
-# Register API Routers
+# Exception Handlers
 # --------------------
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    """Log validation errors for debugging"""
+    print(f"Validation error: {exc}")
+    print(f"Request path: {request.url.path}")
+    print(f"Request body: {await request.body()}")
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors()},
+    )
 
-app.include_router(auth_router)  # prefix already set in auth.py
 
-app.include_router(
-    service_categories_router,
-    prefix="/service-categories",
-    tags=["Service Categories"],
-)
+# --------------------
+# API Version Router
+# --------------------
+api_v1_router = APIRouter(prefix="/api/v1")
 
-app.include_router(
-    services_router,
-    prefix="/services",
-    tags=["Services"],
-)
+# --------------------
+# Register Routers
+# --------------------
+api_v1_router.include_router(auth_router)
+api_v1_router.include_router(service_categories_router)
+api_v1_router.include_router(services_router)
+api_v1_router.include_router(service_packages_router)
+api_v1_router.include_router(service_addons_router)
+api_v1_router.include_router(service_providers_router)
+api_v1_router.include_router(cart_router)
+api_v1_router.include_router(orders_router)
+api_v1_router.include_router(payments_router)
+api_v1_router.include_router(addresses_router)
+api_v1_router.include_router(orders_router)
+api_v1_router.include_router(payments_router)
 
-app.include_router(
-    service_packages_router,
-    prefix="/service-packages",
-    tags=["Service Packages"],
-)
-
-app.include_router(
-    service_addons_router,
-    prefix="/service-addons",
-    tags=["Service Addons"],
-)
-
-app.include_router(
-    service_providers_router,
-    prefix="/service-providers",
-    tags=["Service Providers"],
-)
-
-app.include_router(
-    cart_router,
-    prefix="/cart",
-    tags=["Cart"],
-)
-
-app.include_router(
-    orders_router,
-    prefix="/orders",
-    tags=["Orders"],
-)
-
-app.include_router(
-    payments_router,
-    prefix="/payments",
-    tags=["Payments"],
-)
+app.include_router(api_v1_router)
 
 # --------------------
 # Health Check
 # --------------------
-
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {

@@ -16,20 +16,22 @@ router = APIRouter(
 def list_services(
     category_id: Optional[UUID] = Query(None),
 ):
-    query = supabase.table("services").select("*")
+    try:
+        query = supabase.table("services").select("*")
 
-    if category_id:
-        query = query.eq("category_id", str(category_id))
+        if category_id:
+            query = query.eq("category_id", str(category_id))
 
-    response = query.execute()
-
-    if response.error:
+        response = query.execute()
+        return response.data
+    except Exception as e:
+        print(f"Error in list_services: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=response.error.message,
+            detail=f"Failed to fetch services: {str(e)}"
         )
-
-    return response.data
 
 
 @router.get("/{service_id}", response_model=ServiceBase)
@@ -39,18 +41,16 @@ def get_service(service_id: UUID):
         .table("services")
         .select("*")
         .eq("id", str(service_id))
-        .single()
         .execute()
     )
 
     if response.error:
-        # Not found
-        if response.error.code == "PGRST116":
-            raise HTTPException(status_code=404, detail="Service not found")
-
         raise HTTPException(
             status_code=500,
             detail=response.error.message,
         )
 
-    return response.data
+    if not response.data or len(response.data) == 0:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    return response.data[0]
