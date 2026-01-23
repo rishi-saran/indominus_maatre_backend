@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.core.supabase import supabase
-from app.schemas.page import PageResponse
+from app.schemas.page import PageResponse, PageListResponse, PageListItem
+from typing import Optional
 
 router = APIRouter(
     prefix="/pages",
@@ -24,4 +25,21 @@ def get_page_by_slug(slug: str):
         )
     return response.data
 
+# list all/specific pages -> work for both /pages and /pages?type=service
+@router.get("", response_model=PageListResponse)
+def list_pages(type: Optional[str] = None):
+    query = (
+        supabase
+        .table("pages")
+        .select("slug, title, type")
+        .eq("published", True)
+    )
 
+    if type: #conditional rendering for query params (i.e /pages?type=service)
+        query = query.eq("type", type)
+
+    response = query.execute()
+
+    return {
+        "items": response.data or []
+    }

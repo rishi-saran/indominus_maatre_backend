@@ -23,3 +23,11 @@ class PageResponse(BaseModel):
     published: bool #only published pages can be accessed(RLS enabled)
     created_at: datetime
 
+class PageListItem(BaseModel): # for query params
+    slug: str
+    title: str
+    type: str
+# eg: GET /pages?type=service
+
+class PageListResponse(BaseModel):
+    items: List[PageListItem]
