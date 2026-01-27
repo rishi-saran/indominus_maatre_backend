@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi import APIRouter
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 # --------------------
 # API Routers
@@ -26,6 +27,22 @@ app = FastAPI(
     version="1.0.0",
     openapi_url="/openapi.json",
     docs_url="/docs",
+)
+
+
+# --------------------
+# CORS Middleware
+# --------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://indominus-maathre.vercel.app",  # Your Vercel frontend
+        "http://localhost:3000",  # Local development
+        "http://localhost:5173",  # Vite dev server
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
