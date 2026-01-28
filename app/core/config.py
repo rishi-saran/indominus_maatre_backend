@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str
     RAZORPAY_KEY_SECRET: str
     RAZORPAY_WEBHOOK_SECRET: str
+    
+    # Prokerala panchang config
+    PROKERALA_CLIENT_ID: str
+    PROKERALA_CLIENT_SECRET: str
+
 
     class Config:
         env_file = ".env"

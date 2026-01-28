@@ -18,6 +18,7 @@ from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
 from app.api.addresses import router as addresses_router
 from app.api.pages import router as pages_router
+from app.api.panchang import router as panchang_router
 
 
 # --------------------
@@ -81,7 +82,7 @@ api_v1_router.include_router(orders_router)
 api_v1_router.include_router(payments_router)
 api_v1_router.include_router(addresses_router)
 api_v1_router.include_router(pages_router)
-
+api_v1_router.include_router(panchang_router)
 
 app.include_router(api_v1_router)
 
