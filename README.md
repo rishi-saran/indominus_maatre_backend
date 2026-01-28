@@ -24,3 +24,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Note:** Once running, access the API at `http://localhost:8000` and auto-generated docs at `http://localhost:8000/docs`.
+
+## Running Scripts
+
+### 1. seed_pages.py
+```bash
+python -m scripts.pages.seed_pages
+or
+python3 -m scripts.pages.seed_pages
+```

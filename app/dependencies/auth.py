@@ -39,3 +39,14 @@ def get_current_user(request: Request) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+
+ADMIN_EMAILS = { #for dev only -> change this after role based access is implemented
+    "maatre@gmail.com",
+}
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user["email"] not in ADMIN_EMAILS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return user

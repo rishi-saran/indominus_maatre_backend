@@ -1,9 +1,8 @@
-# app/schemas/page.py
-
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from uuid import UUID
 from datetime import datetime
+from typing import Optional
 
 class PageSection(BaseModel):
     key: str
@@ -31,3 +30,16 @@ class PageListItem(BaseModel): # for query params
 
 class PageListResponse(BaseModel):
     items: List[PageListItem]
+
+class PageCreateRequest(BaseModel):
+    slug: str
+    title: str
+    type: str
+    content: Dict[str, Any]  
+    published: bool = False
+
+class PageUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    type: Optional[str] = None
+    content: Optional[Dict[str, Any]] = None
+    published: Optional[bool] = None
