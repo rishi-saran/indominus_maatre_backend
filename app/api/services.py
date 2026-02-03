@@ -36,21 +36,27 @@ def list_services(
 
 @router.get("/{service_id}", response_model=ServiceBase)
 def get_service(service_id: UUID):
-    response = (
-        supabase
-        .table("services")
-        .select("*")
-        .eq("id", str(service_id))
-        .execute()
-    )
-
-    if response.error:
-        raise HTTPException(
-            status_code=500,
-            detail=response.error.message,
+    try:
+        response = (
+            supabase
+            .table("services")
+            .select("*")
+            .eq("id", str(service_id))
+            .execute()
         )
 
-    if not response.data or len(response.data) == 0:
-        raise HTTPException(status_code=404, detail="Service not found")
+        # No record found
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Service not found")
 
-    return response.data[0]
+        return response.data[0]
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print("Error in get_service:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch service"
+        )

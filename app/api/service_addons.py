@@ -26,7 +26,7 @@ def list_service_addons(
     if response.error:
         raise HTTPException(
             status_code=500,
-            detail=response.error.message,
+            detail="Failed to fetch service addons",
         )
 
     return response.data
@@ -43,16 +43,10 @@ def get_service_addon(addon_id: UUID):
         .execute()
     )
 
-    if response.error:
-        if response.error.code == "PGRST116":
-            raise HTTPException(
-                status_code=404,
-                detail="Service addon not found",
-            )
-
+    if response.error or not response.data:
         raise HTTPException(
-            status_code=500,
-            detail=response.error.message,
+            status_code=404,
+            detail="Service addon not found",
         )
 
     return response.data

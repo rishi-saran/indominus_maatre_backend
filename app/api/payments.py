@@ -200,10 +200,10 @@ def verify_razorpay_payment(
                 .execute()
             )
 
-            if payment_resp.error:
+            if not payment_resp.data:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Failed to save payment: {payment_resp.error.message}",
+                    detail="Failed to save payment",
                 )
 
             # Update order status to PAID
@@ -215,10 +215,10 @@ def verify_razorpay_payment(
                 .execute()
             )
 
-            if order_update.error:
+            if not order_update.data:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Failed to update order: {order_update.error.message}",
+                    detail="Failed to update order",
                 )
 
         return VerifyPaymentResponse(
@@ -245,45 +245,23 @@ def create_payment_entry(
     amount: float = Query(...),
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    This endpoint records a payment for an existing order.
-    - User must own the order
-    - Used after payment gateway confirmation
-    """
-    user_id: UUID = current_user["id"]
-
-    # 1. Verify order belongs to user
-    order_resp = (
-        supabase
-        .table("orders")
-        .select("id")
-        .eq("id", str(order_id))
-        .eq("user_id", str(user_id))
-        .single()
-        .execute()
-    )
-
-    if not order_resp.data:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    # 2. Create payment record
     payment_resp = (
         supabase
         .table("payments")
         .insert({
             "order_id": str(order_id),
             "method": method,
-            "status": status.upper(),
+            "status": status,
             "amount": amount,
         })
         .single()
         .execute()
     )
 
-    if payment_resp.error:
+    if not payment_resp.data:
         raise HTTPException(
             status_code=500,
-            detail=payment_resp.error.message,
+            detail="Failed to create payment entry",
         )
 
     payment = payment_resp.data

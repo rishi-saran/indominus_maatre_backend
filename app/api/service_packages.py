@@ -16,17 +16,22 @@ router = APIRouter(
 def list_service_packages(
     service_id: Optional[UUID] = Query(None),
 ):
-    query = supabase.table("service_packages").select("*")
+    try:
+        query = supabase.table("service_packages").select("*")
 
-    if service_id:
-        query = query.eq("service_id", str(service_id))
+        if service_id:
+            query = query.eq("service_id", str(service_id))
 
-    response = query.execute()
+        response = query.execute()
 
-    if response.error:
+        # ✅ Empty list is OK
+        return response.data or []
+
+    except Exception as e:
+        print("Error in list_service_packages:", e)
         raise HTTPException(
             status_code=500,
-            detail=response.error.message,
+            detail="Failed to fetch service packages",
         )
 
     return response.data
@@ -34,25 +39,32 @@ def list_service_packages(
 
 @router.get("/{package_id}", response_model=ServicePackageOut)
 def get_service_package(package_id: UUID):
-    response = (
-        supabase
-        .table("service_packages")
-        .select("*")
-        .eq("id", str(package_id))
-        .single()
-        .execute()
-    )
+    try:
+        response = (
+            supabase
+            .table("service_packages")
+            .select("*")
+            .eq("id", str(package_id))
+            .execute()
+        )
 
-    if response.error:
-        if response.error.code == "PGRST116":
+        if not response.data:
             raise HTTPException(
                 status_code=404,
                 detail="Service package not found",
             )
 
+        return response.data[0]
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print("Error in get_service_package:", e)
         raise HTTPException(
             status_code=500,
-            detail=response.error.message,
+            detail="Failed to fetch service package",
         )
+
 
     return response.data

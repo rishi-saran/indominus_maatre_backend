@@ -1,6 +1,8 @@
 import httpx
+import logging
 from datetime import datetime
 from app.core.config import settings
+from fastapi import HTTPException
 
 TOKEN_URL = "https://api.prokerala.com/token"
 PANCHANG_URL = "https://api.prokerala.com/v2/astrology/panchang/advanced"
@@ -25,17 +27,24 @@ async def get_advanced_panchang(date, coordinates):
     datetime_str = f"{date}T00:00:00+05:30"
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            PANCHANG_URL,
-            params={
-                "datetime": datetime_str,
-                "coordinates": coordinates,
-                "ayanamsa": 1,
-                "la": "en",
-            },
-            headers={
-                "Authorization": f"Bearer {token}"
-            }
-        )
-        response.raise_for_status()
-        return response.json()["data"]
+        try:
+            response = await client.get(
+                PANCHANG_URL,
+                params={
+                    "datetime": datetime_str,
+                    "coordinates": coordinates,
+                    "ayanamsa": 1,
+                    "la": "en",
+                },
+                headers={
+                    "Authorization": f"Bearer {token}"
+                }
+            )
+            response.raise_for_status()
+            return response.json()["data"]
+        except httpx.HTTPStatusError as e:
+            logging.error(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
+            raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
+        except Exception as e:
+            logging.error(f"Unexpected error occurred: {str(e)}")
+            raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching Panchang data.")

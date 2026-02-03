@@ -29,6 +29,7 @@ app = FastAPI(
     version="1.0.0",
     openapi_url="/openapi.json",
     docs_url="/docs",
+    debug=True,  # Enable debug mode for detailed error messages
 )
 
 
@@ -37,11 +38,7 @@ app = FastAPI(
 # --------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://indominus-maathre.vercel.app",  # Your Vercel frontend
-        "http://localhost:3000",  # Local development
-        "http://localhost:5173",  # Vite dev server
-    ],
+    allow_origins=["*"],  # Replace "*" with specific frontend URL in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

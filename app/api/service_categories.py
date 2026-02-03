@@ -18,10 +18,10 @@ def list_service_categories():
         .execute()
     )
 
-    if response.error:
+    if response.data is None:
         raise HTTPException(
             status_code=500,
-            detail=response.error.message
+            detail="Failed to fetch service categories"
         )
 
     return response.data
