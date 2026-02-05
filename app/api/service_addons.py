@@ -21,29 +21,43 @@ def list_service_addons(
     if service_id:
         query = query.eq("service_id", str(service_id))
 
-    response = query.execute()
-
-    if response.error:
+    try:
+        response = query.execute()
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch service addons",
+            detail=f"Failed to fetch service addons: {exc}",
         )
 
-    return response.data
+    response_error = getattr(response, "error", None)
+    if response_error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch service addons: {response_error}",
+        )
+
+    return response.data or []
 
 
 @router.get("/{addon_id}", response_model=ServiceAddonOut)
 def get_service_addon(addon_id: UUID):
-    response = (
-        supabase
-        .table("service_addons")
-        .select("*")
-        .eq("id", str(addon_id))
-        .single()
-        .execute()
-    )
+    try:
+        response = (
+            supabase
+            .table("service_addons")
+            .select("*")
+            .eq("id", str(addon_id))
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch service addon: {exc}",
+        )
 
-    if response.error or not response.data:
+    response_error = getattr(response, "error", None)
+    if response_error or not response.data:
         raise HTTPException(
             status_code=404,
             detail="Service addon not found",

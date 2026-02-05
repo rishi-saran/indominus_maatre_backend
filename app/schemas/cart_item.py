@@ -9,6 +9,7 @@ class CartItemOut(BaseModel):
     package_id: Optional[UUID] = None
     addon_id: Optional[UUID] = None
     quantity: int
+    price: float
 
     class Config:
         from_attributes = True

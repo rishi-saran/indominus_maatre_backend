@@ -57,16 +57,38 @@ def get_cart(
     resp = (
         supabase
         .table("carts")
-        .select("*, cart_items(*)")
+        .select("*")
         .eq("user_id", str(user_id))
         .limit(1)
         .execute()
     )
 
     if not resp.data:
-        raise HTTPException(status_code=404, detail="Cart not found")
+        # Auto-create empty cart if not found
+        create_resp = (
+            supabase
+            .table("carts")
+            .insert({"user_id": str(user_id)})
+            .execute()
+        )
 
-    return resp.data[0]
+        if not create_resp.data or len(create_resp.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to create cart")
+
+        cart = create_resp.data[0]
+    else:
+        cart = resp.data[0]
+
+    items_resp = (
+        supabase
+        .table("cart_items")
+        .select("*")
+        .eq("cart_id", cart["id"])
+        .execute()
+    )
+
+    cart["cart_items"] = items_resp.data or []
+    return cart
 
 
 # --------------------
@@ -78,6 +100,7 @@ def add_item_to_cart(
     package_id: Optional[UUID] = Query(None),
     addon_id: Optional[UUID] = Query(None),
     quantity: int = Query(1, ge=1),
+    price: float = Query(...),
     current_user: dict = Depends(get_current_user),
 ):
     user_id: UUID = current_user["id"]
@@ -133,7 +156,7 @@ def add_item_to_cart(
         update_resp = (
             supabase
             .table("cart_items")
-            .update({"quantity": item["quantity"] + quantity})
+            .update({"quantity": item["quantity"] + quantity, "price": price})
             .eq("id", item["id"])
             .execute()
         )
@@ -147,6 +170,7 @@ def add_item_to_cart(
         "cart_id": cart_id,
         "service_id": str(service_id),
         "quantity": quantity,
+        "price": price,
     }
 
     if package_id:
