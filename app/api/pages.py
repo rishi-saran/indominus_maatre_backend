@@ -8,11 +8,11 @@ from app.schemas.page import (
     PageCreateRequest,
     PageUpdateRequest,
 )
-from app.dependencies.auth import require_admin
+from app.dependencies.auth import get_current_user, require_admin
 
 router = APIRouter(
     prefix="/pages",
-    tags=["Pages"] 
+    tags=["Pages"],
 )
 
 @router.get("/{slug}", response_model=PageResponse)
@@ -22,27 +22,31 @@ def get_page_by_slug(slug: str):
         .table("pages")
         .select("*")
         .eq("slug", slug)
-        .single()
+        .limit(1)
         .execute()
-    ) # no need to check for published == true, since its RLS protected
-    if not response.data:
-        raise HTTPException(
-            status_code=404,
-            detail="Page not found"
-        )
-    return response.data
+    )
 
-# list all/specific pages -> work for both /pages and /pages?type=service
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    return response.data[0]
+
+
 @router.get("", response_model=PageListResponse)
-def list_pages(type: Optional[str] = None):
+def list_pages(
+    type: Optional[str] = None,
+    current_user: Optional[dict] = Depends(get_current_user),
+):
     query = (
         supabase
         .table("pages")
-        .select("slug, title, type")
-        .eq("published", True)
+        .select("slug, title, type, published")
     )
 
-    if type: #conditional rendering for query params (i.e /pages?type=service)
+    if not current_user or current_user.get("role") != "admin":
+        query = query.eq("published", True)
+
+    if type:
         query = query.eq("type", type)
 
     response = query.execute()
@@ -60,6 +64,7 @@ def create_page(
     payload: PageCreateRequest,
     current_user: dict = Depends(require_admin),
 ):
+    # Check slug uniqueness
     existing = (
         supabase
         .table("pages")
@@ -75,19 +80,36 @@ def create_page(
             detail="Page with this slug already exists",
         )
 
+    data = {
+        "slug": payload.slug,
+        "title": payload.title,
+        "type": payload.type,
+        "published": payload.published,
+        "content": {
+            "sections": [
+                {
+                    "key": "main",
+                    "title": payload.title,   # REQUIRED by schema
+                    "delta": payload.content, # raw Quill delta
+                }
+            ]
+        },
+    }
+
     response = (
         supabase
         .table("pages")
-        .insert(payload.dict())
+        .insert(data)
         .execute()
     )
 
+    if not response.data:
+        raise HTTPException(status_code=500, detail="Failed to create page")
+
     return response.data[0]
 
-@router.put(
-    "/{slug}",
-    response_model=PageResponse,
-)
+
+@router.put("/{slug}")
 def update_page(
     slug: str,
     payload: PageUpdateRequest,
@@ -96,20 +118,20 @@ def update_page(
     update_data = payload.dict(exclude_unset=True)
 
     if not update_data:
-        raise HTTPException(
-            status_code=400,
-            detail="No fields provided for update",
-        )
+        raise HTTPException(status_code=400, detail="No fields provided")
 
-    response = (
-        supabase
-        .table("pages")
-        .update(update_data)
-        .eq("slug", slug)
-        .execute()
-    )
+    if "content" in update_data:
+        update_data["content"] = {
+            "sections": [
+                {
+                    "key": "main",
+                    "title": update_data.get("title", "Content"),
+                    "delta": update_data["content"],  # <-- RAW QUILL DELTA ONLY
+                }
+            ]
+        }
 
-    if not response.data:
-        raise HTTPException(status_code=404, detail="Page not found")
+    supabase.table("pages").update(update_data).eq("slug", slug).execute()
 
-    return response.data[0]
+    return {"success": True}
+
