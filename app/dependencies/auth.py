@@ -40,13 +40,31 @@ def get_current_user(request: Request) -> dict:
             detail="Invalid or expired token",
         )
 
-ADMIN_EMAILS = { #for dev only -> change this after role based access is implemented
-    "maatre@gmail.com",
-}
 def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    if user["email"] not in ADMIN_EMAILS:
+    """
+    Allows access only if user.role === 'admin'
+    """
+
+    response = (
+        supabase
+        .table("users")
+        .select("role")
+        .eq("id", str(user["id"]))
+        .single()
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User profile not found",
+        )
+
+    if response.data["role"] != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required",
         )
+
     return user
+
