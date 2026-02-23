@@ -55,7 +55,7 @@ def list_all_one_on_one_session(current_user: dict = Depends(require_admin)):
     )
 
     response = query.execute()
-    return {"items": response.data or []}
+    return {"items":response.data}
 
 @router.put(
     "/{session_id}",
