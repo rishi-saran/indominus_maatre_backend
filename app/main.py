@@ -19,7 +19,7 @@ from app.api.payments import router as payments_router
 from app.api.addresses import router as addresses_router
 from app.api.pages import router as pages_router
 from app.api.panchang import router as panchang_router
-
+from app.api.one_on_one_session import router as direct_session_router
 
 # --------------------
 # FastAPI App
@@ -80,6 +80,7 @@ api_v1_router.include_router(payments_router)
 api_v1_router.include_router(addresses_router)
 api_v1_router.include_router(pages_router)
 api_v1_router.include_router(panchang_router)
+api_v1_router.include_router(direct_session_router)
 
 app.include_router(api_v1_router)
 
