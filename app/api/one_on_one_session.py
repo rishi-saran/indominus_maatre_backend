@@ -9,9 +9,10 @@ from app.schemas.one_on_one_session import (
     DirectSessionResponse ,
     DirectSessionListResponse, 
     PreDirectSessionRequest, 
-    PreDirectSessionResponse
+    PreDirectSessionResponse,
+    DirectSessionUpdate
 )
-
+from app.services.one_on_one_sessions_service import assign_priest
 
 router = APIRouter(prefix="/sessions", tags=["1 on 1 Sessions"])
 
@@ -37,7 +38,7 @@ def request_one_on_one_session(
         .execute()
     )
     if not response:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail = "Supabase Error")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail = "Failed to create a session")
     
     return response.data[0]
 
@@ -59,12 +60,51 @@ def list_all_one_on_one_session(current_user: dict = Depends(require_admin)):
 
 @router.put(
     "/{session_id}",
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
     response_model=DirectSessionResponse
 )
 def approve_direct_session_request(
     session_id: UUID, 
-    request: PreDirectSessionResponse,
     current_user: dict = Depends(require_admin)
 ): 
-    data = request.dict(exclude_unset=True)
+    session_res = (
+        supabase
+        .table("sessions")
+        .select("*")
+        .eq("id", str(session_id))
+        .single()
+        .execute()
+    )
+    session = session_res.data
+
+    if not session or session["status"] != "requested":
+        raise HTTPException(400, "Session not approvable")
+    
+    priest_id = assign_priest(
+        session["start_time"],
+        session["end_time"]
+    )
+    
+    update_priest = (
+        supabase
+        .table("priest_availability")
+        .update({
+            "last_assigned_at": session["start_time"]
+        })
+        .eq("priest_id", str(priest_id))
+        .execute()
+    )
+    
+
+    update_res = (
+        supabase
+        .table("sessions")
+        .update({
+            "priest_id": str(priest_id),
+            "status": "approved",
+        })
+        .eq("id", str(session_id))
+        .execute()
+    )
+
+    return update_res.data[0]
