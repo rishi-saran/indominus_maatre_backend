@@ -17,8 +17,10 @@ from app.api.cart import router as cart_router
 from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
 from app.api.addresses import router as addresses_router
+
 from app.api.pages import router as pages_router
 from app.api.panchang import router as panchang_router
+from app.api.admin.dashboard import router as admin_dashboard_router
 
 
 # --------------------
@@ -38,7 +40,7 @@ app = FastAPI(
 # --------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace "*" with specific frontend URL in production
+    allow_origins=["http://localhost:3000"],  # Explicitly allow frontend origin for credentials
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,6 +70,7 @@ api_v1_router = APIRouter(prefix="/api/v1")
 # --------------------
 # Register Routers
 # --------------------
+
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(service_categories_router)
 api_v1_router.include_router(services_router)
@@ -80,6 +83,7 @@ api_v1_router.include_router(payments_router)
 api_v1_router.include_router(addresses_router)
 api_v1_router.include_router(pages_router)
 api_v1_router.include_router(panchang_router)
+api_v1_router.include_router(admin_dashboard_router)
 
 app.include_router(api_v1_router)
 
