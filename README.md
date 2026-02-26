@@ -33,3 +33,15 @@ python -m scripts.pages.seed_pages
 or
 python3 -m scripts.pages.seed_pages
 ```
+
+# Running Celery and Celery Beat
+### Worker
+Executes tasks from the queue and handles the actual logic.
+```bash
+celery -A app.worker worker -l info
+```
+### Beat
+A scheduler that triggers tasks at specific intervals or times.
+```bash
+celery -A app.worker beat -l info
+```
