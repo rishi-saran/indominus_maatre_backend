@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     PROKERALA_CLIENT_ID: str
     PROKERALA_CLIENT_SECRET: str
 
+    # redis(mq)
+    REDIS_URL: str
+
+    # aws ses smtp
+    SES_SMTP_HOST: str
+    SES_SMTP_PORT: int
+    SES_SMTP_USERNAME: str
+    SES_SMTP_PASSWORD: str
+    SES_FROM_EMAIL: str
 
     class Config:
         env_file = ".env"

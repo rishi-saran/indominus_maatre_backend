@@ -1,12 +1,13 @@
 # /app/api/one_on_one_session.py
 from fastapi import APIRouter, HTTPException, status, Depends
 from uuid import UUID
+from datetime import datetime, timezone, timedelta  
 
 from app.core.supabase import supabase
 from app.dependencies.auth import get_current_user, require_admin
 from app.schemas.one_on_one_session import (
     SessionLifecycle,
-    DirectSessionResponse ,
+    DirectSessionResponse,
     DirectSessionListResponse, 
     PreDirectSessionRequest, 
     PreDirectSessionResponse,
@@ -14,7 +15,11 @@ from app.schemas.one_on_one_session import (
 )
 from app.services.one_on_one_sessions_service import assign_priest
 
+from app.tasks.email_tasks import send_confirmation_email_task
+
 router = APIRouter(prefix="/sessions", tags=["1 on 1 Sessions"])
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 @router.post(
     "/request-session", 
@@ -23,40 +28,32 @@ router = APIRouter(prefix="/sessions", tags=["1 on 1 Sessions"])
 )
 def request_one_on_one_session(
     request: PreDirectSessionRequest, 
-    current_user : dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):  
     session_data = {
-        "start_time":request.start_time.isoformat(),
-        "end_time":request.end_time.isoformat(),
-        "customer_id":str(current_user["id"]),
+        "start_time": request.start_time.isoformat(),
+        "end_time": request.end_time.isoformat(),
+        "customer_id": str(current_user["id"]),
         "status": SessionLifecycle.requested.value
     }
-    response = (
-        supabase
-        .table("sessions")
-        .insert(session_data)
-        .execute()
-    )
+    response = supabase.table("sessions").insert(session_data).execute()
+    
     if not response:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail = "Failed to create a session")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create a session")
     
     return response.data[0]
 
 @router.get(
     "/list-all", 
     status_code=status.HTTP_200_OK,
-    response_model= DirectSessionListResponse
+    response_model=DirectSessionListResponse
 )
 def list_all_one_on_one_session(current_user: dict = Depends(require_admin)):
-    
-    query = (
-        supabase
-        .table("sessions")
-        .select("*")
-    )
-
+    query = supabase.table("sessions").select("*")
     response = query.execute()
-    return {"items":response.data}
+    return {"items": response.data}
+
+from app.tasks.email_tasks import send_confirmation_email_task
 
 @router.put(
     "/{session_id}",
@@ -64,47 +61,19 @@ def list_all_one_on_one_session(current_user: dict = Depends(require_admin)):
     response_model=DirectSessionResponse
 )
 def approve_direct_session_request(
-    session_id: UUID, 
+    session_id: UUID,
     current_user: dict = Depends(require_admin)
-): 
-    session_res = (
-        supabase
-        .table("sessions")
-        .select("*")
-        .eq("id", str(session_id))
-        .single()
-        .execute()
-    )
-    session = session_res.data
+):
+    response = supabase.rpc(
+        "approve_and_assign_session",
+        {"p_session_id": str(session_id)}
+    ).execute()
 
-    if not session or session["status"] != "requested":
-        raise HTTPException(400, "Session not approvable")
-    
-    priest_id = assign_priest(
-        session["start_time"],
-        session["end_time"]
-    )
-    
-    update_priest = (
-        supabase
-        .table("priest_availability")
-        .update({
-            "last_assigned_at": session["start_time"]
-        })
-        .eq("priest_id", str(priest_id))
-        .execute()
-    )
-    
+    if not response.data:
+        raise HTTPException(400, "Unable to approve session")
 
-    update_res = (
-        supabase
-        .table("sessions")
-        .update({
-            "priest_id": str(priest_id),
-            "status": "approved",
-        })
-        .eq("id", str(session_id))
-        .execute()
-    )
+    session = response.data[0]
 
-    return update_res.data[0]
+    send_confirmation_email_task.delay(str(session["session_id"]))
+
+    return session
