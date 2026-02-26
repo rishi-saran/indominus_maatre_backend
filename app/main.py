@@ -20,7 +20,12 @@ from app.api.addresses import router as addresses_router
 
 from app.api.pages import router as pages_router
 from app.api.panchang import router as panchang_router
+
 from app.api.admin.dashboard import router as admin_dashboard_router
+from app.api.admin.finance import router as admin_finance_router
+from app.api.admin.priests import router as admin_priests_router
+from app.api.admin.onboarding import router as admin_onboarding_router
+from app.api.admin.reports import router as admin_reports_router
 
 
 # --------------------
@@ -40,7 +45,7 @@ app = FastAPI(
 # --------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Explicitly allow frontend origin for credentials
+    allow_origins=["*"],  # Explicitly allow frontend origin for credentials
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,6 +89,11 @@ api_v1_router.include_router(addresses_router)
 api_v1_router.include_router(pages_router)
 api_v1_router.include_router(panchang_router)
 api_v1_router.include_router(admin_dashboard_router)
+api_v1_router.include_router(admin_finance_router)
+api_v1_router.include_router(admin_priests_router)
+api_v1_router.include_router(admin_onboarding_router)
+api_v1_router.include_router(admin_reports_router)
+
 
 app.include_router(api_v1_router)
 
