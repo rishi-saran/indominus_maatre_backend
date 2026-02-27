@@ -14,6 +14,7 @@ from app.schemas.one_on_one_session import (
     DirectSessionUpdate
 )
 from app.services.one_on_one_sessions_service import assign_priest
+from app.services.stream_service import StreamService
 
 from app.tasks.email_tasks import send_confirmation_email_task
 
@@ -53,7 +54,6 @@ def list_all_one_on_one_session(current_user: dict = Depends(require_admin)):
     response = query.execute()
     return {"items": response.data}
 
-from app.tasks.email_tasks import send_confirmation_email_task
 
 @router.put(
     "/{session_id}",
@@ -73,7 +73,16 @@ def approve_direct_session_request(
         raise HTTPException(400, "Unable to approve session")
 
     session = response.data[0]
+    session_db_id = session["id"]  
 
-    send_confirmation_email_task.delay(str(session["session_id"]))
+    stream_id = f"session_{session_db_id}"
+
+    StreamService.create_call(stream_id)
+
+    supabase.table("sessions").update(
+        {"stream_id": stream_id}
+    ).eq("id", session_db_id).execute()
+
+    send_confirmation_email_task.delay(str(session_db_id))
 
     return session

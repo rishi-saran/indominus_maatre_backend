@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str
     SUPABASE_ANON_KEY: str
     SUPABASE_JWT_SECRET: str
-    
+    STREAM_API_KEY: str
+    STREAM_API_SECRET: str
+
     # Razorpay Configuration
     RAZORPAY_KEY_ID: str
     RAZORPAY_KEY_SECRET: str

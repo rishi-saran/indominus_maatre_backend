@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from app.core.celery_app import celery_app
 from app.core.supabase import supabase
+from app.services.stream_service import StreamService
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -15,7 +16,7 @@ def enable_backstage_task(self):
     response = (
         supabase
         .table("sessions")
-        .select("id")
+        .select("id, stream_id")
         .eq("status", "approved")
         .eq("backstage_enabled", False)
         .gte("start_time", window_start.isoformat())
@@ -24,11 +25,13 @@ def enable_backstage_task(self):
     )
 
     for session in response.data or []:
-        # todo: Stream API call will go here later
+        if session["stream_id"]:
+            StreamService.enable_backstage(session["stream_id"])
 
         supabase.table("sessions").update(
             {"backstage_enabled": True}
         ).eq("id", session["id"]).execute()
+
 
 @celery_app.task(bind=True)
 def start_session_task(self):
@@ -37,7 +40,7 @@ def start_session_task(self):
     response = (
         supabase
         .table("sessions")
-        .select("id")
+        .select("id, stream_id")
         .eq("status", "approved")
         .eq("live_started", False)
         .lte("start_time", now.isoformat())
@@ -45,7 +48,8 @@ def start_session_task(self):
     )
 
     for session in response.data or []:
-        # todo: Stream API call will go here later
+        if session["stream_id"]:
+            StreamService.start_call(session["stream_id"])
 
         supabase.table("sessions").update(
             {
@@ -54,6 +58,7 @@ def start_session_task(self):
             }
         ).eq("id", session["id"]).execute()
 
+
 @celery_app.task(bind=True)
 def end_session_task(self):
     now = datetime.now(tz=IST)
@@ -61,14 +66,15 @@ def end_session_task(self):
     response = (
         supabase
         .table("sessions")
-        .select("id")
+        .select("id, stream_id")
         .eq("status", "live")
         .lte("end_time", now.isoformat())
         .execute()
     )
 
     for session in response.data or []:
-        # todo: Stream API call will go here later
+        if session["stream_id"]:
+            StreamService.end_call(session["stream_id"])
 
         supabase.table("sessions").update(
             {"status": "ended"}
