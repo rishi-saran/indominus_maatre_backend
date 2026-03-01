@@ -1,40 +1,97 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
-from pydantic import BaseModel
-class PriestUpdate(BaseModel):
-    first_name: str = None
-    last_name: str = None
-    email: str = None
-    phone: str = None
-    is_active: bool = None
+from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, EmailStr
+
+from app.core.supabase import get_service_role_client
 from app.dependencies.auth import require_admin
-from app.core.supabase import supabase
+
+
+class PriestUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    is_active: Optional[bool] = None
+
 
 router = APIRouter(prefix="/admin/priests", tags=["Admin Priests"])
 
 
-# Update priest details
+# Update priest — {priest_id} is public.users.id where role='priest'
 @router.put("/{priest_id}", status_code=200)
 def update_priest(priest_id: str, update: PriestUpdate, current_user=Depends(require_admin)):
-    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    client = get_service_role_client()
+
+    # Verify priest exists in public.users
+    existing_resp = (
+        client.table("users")
+        .select("id, email, first_name, last_name, phone, is_active")
+        .eq("id", priest_id)
+        .eq("role", "priest")
+        .limit(1)
+        .execute()
+    )
+    existing_rows = existing_resp.data or []
+    if not existing_rows:
+        raise HTTPException(status_code=404, detail="Priest not found.")
+    existing = existing_rows[0]
+
+    update_data = update.model_dump(exclude_none=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update fields provided.")
-    resp = supabase.table("users").update(update_data).eq("id", priest_id).eq("role", "priest").execute()
-    if resp.error:
-        raise HTTPException(status_code=400, detail=resp.error['message'] if isinstance(resp.error, dict) and 'message' in resp.error else str(resp.error))
-    if not resp.data:
-        raise HTTPException(status_code=404, detail="Priest not found or not updated.")
-    return {"success": True, "updated": resp.data}
 
-# Delete priest
+    # All editable fields live in public.users
+    users_payload = {k: v for k, v in update_data.items() if k in ("first_name", "last_name", "phone", "email", "is_active")}
+    users_resp = (
+        client.table("users")
+        .update(users_payload)
+        .eq("id", priest_id)
+        .execute()
+    )
+    if not users_resp.data:
+        raise HTTPException(status_code=404, detail="Failed to update priest.")
+
+    # Sync email to Supabase Auth only when it actually changed
+    if "email" in update_data and update_data["email"] != existing.get("email"):
+        try:
+            client.auth.admin.update_user_by_id(priest_id, {"email": update_data["email"]})
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to update auth user email: {str(exc)}")
+
+    return users_resp.data[0]
+
+
+# Delete priest — {priest_id} is public.users.id where role='priest'
 @router.delete("/{priest_id}", status_code=200)
 def delete_priest(priest_id: str, current_user=Depends(require_admin)):
-    resp = supabase.table("users").delete().eq("id", priest_id).eq("role", "priest").execute()
-    if resp.error:
-        raise HTTPException(status_code=400, detail=resp.error['message'] if isinstance(resp.error, dict) and 'message' in resp.error else str(resp.error))
-    if not resp.data:
-        raise HTTPException(status_code=404, detail="Priest not found or not deleted.")
-    return {"success": True, "deleted": resp.data}
+    client = get_service_role_client()
+
+    # Verify priest exists
+    existing_resp = (
+        client.table("users")
+        .select("id")
+        .eq("id", priest_id)
+        .eq("role", "priest")
+        .limit(1)
+        .execute()
+    )
+    if not (existing_resp.data or []):
+        raise HTTPException(status_code=404, detail="Priest not found.")
+
+    # Delete profile row (profiles.id = users.id)
+    client.table("profiles").delete().eq("id", priest_id).execute()
+
+    # Delete from public.users
+    client.table("users").delete().eq("id", priest_id).execute()
+
+    # Delete from Supabase Auth
+    try:
+        client.auth.admin.delete_user(priest_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to delete auth user: {str(exc)}")
+
+    return {"message": "Priest deleted successfully"}
 
 @router.get("/", summary="Get list of priests", description="Admin: List priests with pagination.")
 def list_priests(
@@ -42,8 +99,9 @@ def list_priests(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0)
 ):
+    client = get_service_role_client()
     # Fetch priests from users table where role = 'priest'
-    priests_resp = supabase.table("users") \
+    priests_resp = client.table("users") \
         .select("id, first_name, last_name, email, phone, is_active, created_at") \
         .eq("role", "priest") \
         .range(offset, offset + limit - 1) \
@@ -51,7 +109,7 @@ def list_priests(
     priests = priests_resp.data or []
 
     # Get total count
-    count_resp = supabase.table("users") \
+    count_resp = client.table("users") \
         .select("id", count="exact") \
         .eq("role", "priest") \
         .execute()
@@ -63,7 +121,7 @@ def list_priests(
     # Fetch total bookings for each priest (orders.provider_id = priest id)
     bookings_map = {}
     if priest_ids:
-        orders_resp = supabase.table("orders") \
+        orders_resp = client.table("orders") \
             .select("provider_id") \
             .in_("provider_id", priest_ids) \
             .execute()
@@ -73,7 +131,7 @@ def list_priests(
     # Fetch average rating for each priest (reviews.user_id = priest id)
     ratings_map = {}
     if priest_ids:
-        reviews_resp = supabase.table("reviews") \
+        reviews_resp = client.table("reviews") \
             .select("user_id, rating") \
             .in_("user_id", priest_ids) \
             .execute()

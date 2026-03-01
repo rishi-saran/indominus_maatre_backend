@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi import APIRouter
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -45,7 +45,7 @@ app = FastAPI(
 # --------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Explicitly allow frontend origin for credentials
+    allow_origins=["http://localhost:3000"],  # Explicitly allow frontend origin for credentials
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,6 +64,15 @@ async def validation_exception_handler(request, exc):
     return JSONResponse(
         status_code=400,
         content={"detail": exc.errors()},
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={"Access-Control-Allow-Origin": request.headers.get("origin", "*")},
     )
 
 

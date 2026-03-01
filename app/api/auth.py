@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Response, Request, status
 
 from app.schemas.auth import SignupRequest, LoginRequest
 from app.schemas.user import UserResponse
-from app.core.supabase import supabase
+from app.core.supabase import get_anon_client, get_service_role_client
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -58,7 +58,10 @@ async def signup(payload: SignupRequest):
     2. Create matching row in public.profiles
     """
     try:
-        result = supabase.auth.sign_up(
+        auth_client = get_anon_client()
+        db_client = get_service_role_client()
+
+        result = auth_client.auth.sign_up(
             {
                 "email": payload.email,
                 "password": payload.password,
@@ -70,7 +73,7 @@ async def signup(payload: SignupRequest):
             raise HTTPException(status_code=400, detail="Signup failed")
 
         # 🔑 Create profile row linked to auth.users.id
-        supabase.table("profiles").insert(
+        db_client.table("profiles").insert(
             {
                 "id": user.id,
                 "role": "user",
@@ -95,7 +98,8 @@ async def login(
     Login using Supabase Auth
     """
     try:
-        result = supabase.auth.sign_in_with_password(
+        auth_client = get_anon_client()
+        result = auth_client.auth.sign_in_with_password(
             {
                 "email": payload.email,
                 "password": payload.password,
@@ -135,7 +139,8 @@ async def refresh(
         raise HTTPException(status_code=401, detail="Missing refresh token")
 
     try:
-        result = supabase.auth.refresh_session(refresh_token)
+        auth_client = get_anon_client()
+        result = auth_client.auth.refresh_session(refresh_token)
         session = result.session
 
         if session is None:
