@@ -116,10 +116,17 @@ async def login(
             refresh_token=session.refresh_token,
         )
 
+        # Fetch role from public.users
+        uid = result.user.id
+        db_client = get_service_role_client()
+        user_row = db_client.table("users").select("role").eq("id", uid).limit(1).execute()
+        role = (user_row.data[0]["role"] if user_row.data else "customer")
+
         return {
             "message": "Login successful",
-            "user_id": result.user.id,
+            "user_id": uid,
             "email": result.user.email,
+            "role": role,
         }
 
     except Exception:

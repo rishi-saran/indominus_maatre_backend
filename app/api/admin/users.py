@@ -85,6 +85,7 @@ def create_admin_user(payload: AdminUserCreate, current_user=Depends(require_adm
             "email": payload.email,
             "password": payload.plain_password,
             "email_confirm": True,
+            "user_metadata": {"role": "admin"},
         })
         auth_user = auth_result.user
         if not auth_user:

@@ -77,6 +77,7 @@ def approve_onboarding_request(request_id: str, current_user=Depends(require_adm
             "email": req["email"],
             "password": plain_password,
             "email_confirm": True,
+            "user_metadata": {"role": "priest"},
         })
         user = auth_result.user
         if not user:
