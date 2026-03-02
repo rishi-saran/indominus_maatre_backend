@@ -40,18 +40,6 @@ jobs:
             maathre/maathre-backend:${{ env.IMAGE_TAG }}
             maathre/maathre-backend:latest
 
-      - name: Build and Push Docker Image (Staging)
-        if: github.ref == 'refs/heads/staging'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          no-cache: true
-          tags: |
-            maathre/maathre-backend-staging:${{ env.IMAGE_TAG }}
-            maathre/maathre-backend-staging:latest
-
       - name: Deploy on EC2 (Production)
         if: github.ref == 'refs/heads/main'
         uses: appleboy/ssh-action@v1.2.2
