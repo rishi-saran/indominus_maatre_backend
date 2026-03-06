@@ -28,6 +28,7 @@ from app.api.admin.onboarding import router as admin_onboarding_router
 from app.api.admin.reports import router as admin_reports_router
 from app.api.admin.settings import router as admin_settings_router
 from app.api.admin.users import router as admin_users_router
+from app.api.admin.bookings import router as admin_bookings_router
 
 
 # --------------------
@@ -106,6 +107,7 @@ api_v1_router.include_router(admin_onboarding_router)
 api_v1_router.include_router(admin_reports_router)
 api_v1_router.include_router(admin_settings_router)
 api_v1_router.include_router(admin_users_router)
+api_v1_router.include_router(admin_bookings_router)
 
 
 app.include_router(api_v1_router)
