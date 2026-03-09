@@ -1,3 +1,4 @@
+# /app/tasks/email_tasks.py
 from app.core.celery_app import celery_app
 from app.core.supabase import supabase
 from app.services.email_service import EmailService
@@ -34,7 +35,7 @@ def send_confirmation_email_task(self, session_id: str):
     if not session or session["confirmation_email_sent"]:
         return
 
-    join_url = f"https://localhost:3000/join/{session_id}"
+    join_url = f"https://localhost:3000/one-on-one/{session_id}"
     subject, body = build_session_confirmation_email(join_url)
 
 
@@ -69,8 +70,9 @@ def send_reminder_email_task(self):
         .select("*")
         .eq("status", "approved")
         .eq("reminder_email_sent", False)
-        .gte("start_time", window_start.isoformat())
-        .lte("start_time", window_end.isoformat())
+        # We need to strictly format it to the ISO 8601 string Supabase expects
+        .gte("start_time", window_start.strftime("%Y-%m-%dT%H:%M:%S.000000+00:00"))
+        .lte("start_time", window_end.strftime("%Y-%m-%dT%H:%M:%S.000000+00:00"))
         .execute()
     )
 
@@ -85,7 +87,7 @@ def send_reminder_email_task(self):
             .data
         )
 
-        join_url = f"https://localhost:3000/join/{session['id']}"
+        join_url = f"https://localhost:3000/one-on-one/{session['id']}"
         subject, body = build_session_reminder_email(join_url)
 
         EmailService.send_html_email(

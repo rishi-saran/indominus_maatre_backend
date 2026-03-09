@@ -1,3 +1,4 @@
+# /app/tasks/debug_tasks.py
 from app.core.celery_app import celery_app
 import time
 

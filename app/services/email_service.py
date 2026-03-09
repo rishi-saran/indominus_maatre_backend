@@ -1,3 +1,5 @@
+# /app/services/email_service.py
+
 import smtplib
 from email.mime.text import MIMEText
 from app.core.config import settings

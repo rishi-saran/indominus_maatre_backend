@@ -1,3 +1,4 @@
+# /app/dependencies/auth.py
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status

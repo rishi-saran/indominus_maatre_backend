@@ -1,3 +1,4 @@
+# /app/worker.py
 from app.core.celery_app import celery_app # noqa
 from app.tasks import debug_tasks  # noqa
 from app.tasks import session_lifecycle_tasks  # noqa

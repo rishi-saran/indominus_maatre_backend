@@ -1,3 +1,5 @@
+# /app/api/one_on_one_session.py
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from uuid import UUID
 from datetime import timezone, timedelta
@@ -88,11 +90,25 @@ def approve_direct_session_request(
 
     stream_id = f"session_{session_db_id}"
 
-    StreamService.create_call(stream_id, session["customer_id"])
+    try:
+        StreamService.create_call(
+            stream_id,
+            session["customer_id"],
+            session["priest_id"]
+        )
+    except Exception as e:
+        print("Stream call creation failed:", e)
+        raise HTTPException(500, "Failed to create video call")
 
-    supabase.table("sessions").update(
-        {"stream_id": stream_id}
-    ).eq("id", session_db_id).execute()
+    update_response = (
+        supabase
+        .table("sessions")
+        .update({"stream_id": stream_id})
+        .eq("id", session_db_id)
+        .execute()
+    )
+
+    print("Stream ID update:", update_response)
 
     send_confirmation_email_task.delay(str(session_db_id))
 
@@ -123,12 +139,26 @@ def join_session(
 
     session = response.data
 
+    user_id = str(current_user["id"])
+
     allowed_users = [
         session["customer_id"],
         session["priest_id"]
     ]
 
-    if str(current_user["id"]) not in allowed_users and current_user["role"] != "admin":
+    # Check admin role from users table
+    role_response = (
+        supabase
+        .table("users")
+        .select("role")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+
+    is_admin = role_response.data and role_response.data["role"] == "admin"
+
+    if user_id not in allowed_users and not is_admin:
         raise HTTPException(403, "You are not allowed to join this session")
 
     if session["status"] not in ["approved", "live"]:
@@ -139,13 +169,23 @@ def join_session(
     if not call_id:
         raise HTTPException(400, "Stream not initialized")
 
-    user_id = str(current_user["id"])
-
     token = StreamService.create_token(user_id)
+    
+    user_profile = (
+        supabase
+        .table("users")
+        .select("first_name")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+
+    first_name = user_profile.data["first_name"]
 
     return {
         "call_id": call_id,
         "token": token,
         "user_id": user_id,
+        "first_name": first_name,
         "api_key": StreamService.api_key
     }
